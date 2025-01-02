@@ -356,7 +356,10 @@ if __name__ == "__main__":
 
     for fn_i, fn in tqdm(enumerate(files)):
         fname = fn.split('/')[-1]
-        mask_filepath = mask_filepaths[fn_i]
+        if args.mask_path:
+            mask_filepath = mask_filepaths[fn_i]
+        else:
+            mask_filepath = None
 
         # ------------- COMPUTE SNAKE -------------
         # ... and other image processing
@@ -501,7 +504,7 @@ if __name__ == "__main__":
         with BytesIO() as img_buf2:
             # add CNB thumbnail to slide
             osh = openslide.OpenSlide(fn)
-            thumbnail = osh.get_thumbnail()
+            thumbnail = osh.get_thumbnail(size=(500, 500))
             
             plt.imshow(thumbnail)
 
