@@ -329,7 +329,7 @@ def compute_snake(fn, mask_path=None):
                     w_edge=w_edge, max_num_iter=max_num_iter, convergence=convergence, boundary_condition='fixed')
     
     return snake, img, contours, rp, b, num_points
-
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--im_path', type=str, default='/home/jackson/data/tortuosity_data')
@@ -343,7 +343,6 @@ if __name__ == "__main__":
 
     os.environ["PAQUO_QUPATH_DIR"] = "/opt/QuPath/bin/QuPath"
     files = sorted(glob.glob(os.path.join(args.im_path, "*.svs")))
-    gt_files = sorted(glob.glob(os.path.join(args.gt_path, "*.png")))
 
     if args.mask_path:
         mask_filepaths = sorted(glob.glob(os.path.join(args.mask_path, "*.png")))
@@ -500,9 +499,11 @@ if __name__ == "__main__":
         #     plt.close()
 
         with BytesIO() as img_buf2:
-            # add ground truth to slide
-            # plot gt_files[fn_i] with imshow
-            plt.imshow(Image.open(gt_files[fn_i]))
+            # add CNB thumbnail to slide
+            osh = openslide.OpenSlide(fn)
+            thumbnail = osh.get_thumbnail()
+            
+            plt.imshow(thumbnail)
 
             plt.savefig(img_buf2, format='png', bbox_inches='tight', dpi=600.0)
             with Image.open(img_buf2) as image:
