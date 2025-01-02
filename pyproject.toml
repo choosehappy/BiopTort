@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools >= 64", "setuptools_scm >= 8", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# ----------------------------------------------------------------------------------
+[project]
+name = "bioptort"
+license = {file = "LICENSE.txt"}
+authors = [{name = "Andrew Janowczyk"}, {name = "Jackson Jacobs"}]
+description = "BiopTort is a Python package for quantifying tortuosity in core needle biopsies."
+readme = {file = "README.md", content-type = "text/markdown"}
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Scientific/Engineering :: Digital Pathology",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Utilities",
+    "Operating System :: Unix"
+]
+
+requires-python = ">=3.8"
+dependencies = [
+    "scikit-image >= 0.18.0",
+    "shapely >= 1.7.0",
+    "scipy >= 1.5.0",
+    "openslide-python >= 1.1.1",
+    "matplotlib >= 3.3.0",
+    "numpy >= 1.19.0",
+    "python-pptx >= 0.6.18",
+    "pillow >= 8.0.0",
+    "tqdm >= 4.50.0",
+    "opencv-python >= 4.4.0",
+    "argparse >= 1.1"
+]
+dynamic = ["version"]
+
+# ----------------------------------------------------------------------------------
+[project.urls]
+Homepage = "https://github.com/choosehappy/BiopTort"
+
+# ----------------------------------------------------------------------------------
+[project.scripts]
+run_module = "bioptort.__main__:main"
+
+# ----------------------------------------------------------------------------------
+[tool.setuptools_scm]
+version_file = "bioptort/_version.py"
+
+# ----------------------------------------------------------------------------------
+[tool.pytest.ini_options]
+addopts = "-v"
+
+# ----------------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["bioptort"]
+
+# ----------------------------------------------------------------------------------
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+  "if MYPY:",
+  "except ImportError:",
+]
