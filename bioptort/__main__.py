@@ -338,7 +338,7 @@ if __name__ == "__main__":
     parser.add_argument('--csv_save', type=str, default=None)
     parser.add_argument('--mask_path', type=str, default=None, help="The directory containing files with [IMAGENAME]mask_use.png naming convention. These masks will be used instead of computing the mask internally.")
     parser.add_argument('--sort', '-s', default=False, action='store_true', help="Sort the slides in order of highest to lowest tortuosity.")
-    parser.add_argument('--gauss_sigma', type=float, default=2, help="The sigma value for the gaussian filter.")
+    parser.add_argument('--gauss_sigma', type=float, default=20, help="The sigma value for the gaussian filter.")
     args = parser.parse_args()
 
     os.environ["PAQUO_QUPATH_DIR"] = "/opt/QuPath/bin/QuPath"
