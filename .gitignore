@@ -2,3 +2,4 @@ venv/
 __pycache__/
 bioptort.egg-info/
 _version.py
+build/
