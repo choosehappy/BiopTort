@@ -321,7 +321,7 @@ def process_mask(mask: PIL.Image) -> np.ndarray:
         binary_dilation(b, iterations=1))
 
 
-def compute_snake(img: PIL.Image, b: np.ndarray):
+def compute_snake(b: np.ndarray):
     # --- Hyperparameters ---
     pixel_lengths_between_points = 6    # the number of pixel-lengths between each point on the initial line.
     # --- active contour parameters ---
@@ -438,7 +438,7 @@ def main():
             # ------------- COMPUTE SNAKE -------------
             # ... and other image processing
             try:
-                snake, contours, rp, b, num_points = compute_snake(image, core_mask)
+                snake, contours, rp, b, num_points = compute_snake(core_mask)
             except ValueError as e:
                 print(f"Skipping core {core_mask_i} in file {fn} due to error: {e}")
                 continue
