@@ -19,15 +19,13 @@ RUN python3.9 -m pip install uv
 RUN mkdir -p /opt/BiopTort
 WORKDIR /opt/BiopTort
 
-RUN uv venv /opt/BiopTort/.venv
-ENV VIRTUAL_ENV=/opt/BiopTort/.venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-COPY ../pyproject.toml /opt/BiopTort/
+COPY ../pyproject.toml ./
+RUN uv venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install -r pyproject.toml
 
-COPY ./ /opt/BiopTort/
+COPY ./ ./
 # Install BiopTort to the uv-managed environment
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install .
