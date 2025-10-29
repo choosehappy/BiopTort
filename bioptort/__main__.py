@@ -129,7 +129,10 @@ def remove_loops(points):
 
 # ---------------------------------------------------
 def remove_background_points(points, mask):
-    return np.array([p for p in points if mask[int(p[0]), int(p[1])]])
+    try:
+        return np.array([p for p in points if mask[int(p[0]), int(p[1])]])
+    except IndexError:
+        raise IndexError("L contains points that exceed the boundaries of the image. Your image likely contains artifacts near the edges.")
 
 def apply_gaussian_filter(point_array, sigma=1):
     X_values = point_array[:, 0]
