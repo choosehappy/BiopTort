@@ -1,6 +1,6 @@
 import os
 from typing import Tuple, Optional
-from skimage.morphology import remove_small_holes, remove_small_objects, binary_dilation, disk
+from skimage.morphology import remove_small_holes, remove_small_objects, disk
 from skimage.measure import regionprops, find_contours
 from skimage.segmentation import active_contour
 from skimage.filters import rank
@@ -27,6 +27,8 @@ from bioptort.mask_utils import split_binary_cnb_mask
 
 # ------------------- CONSTANTS -------------------
 WORKING_MAGNIFICATION = 0.625
+MASK_DILATION_ITERATIONS = 1
+MINIMUM_SNAKE_LENGTH = 5
 
 # ------------------- UTILS -------------------
 def get_base_magnification(osh: openslide.OpenSlide) -> float:
@@ -319,9 +321,10 @@ def generate_mask(img: np.ndarray, disk_size=2, threshold=210) -> np.ndarray:
 def process_mask(mask: PIL.Image) -> np.ndarray:
     b = remove_small_holes(mask, 1000)
     b = remove_small_objects(b, 100)
+    if MASK_DILATION_ITERATIONS > 0:
+        b = binary_dilation(b, iterations=MASK_DILATION_ITERATIONS)
 
-    return binary_fill_holes(
-        binary_dilation(b, iterations=1))
+    return binary_fill_holes(b)
 
 
 def compute_snake(b: np.ndarray):
@@ -379,6 +382,8 @@ def compute_snake(b: np.ndarray):
 
     dist = np.linalg.norm(closest - farthest)
     num_points = int(dist / pixel_lengths_between_points)
+    if num_points < MINIMUM_SNAKE_LENGTH:
+        raise ValueError("The detected tissue region is too small to compute a reliable snake. Skipping.")
     r = np.linspace(closest[0], farthest[0], num_points)
     c = np.linspace(closest[1], farthest[1], num_points)
     

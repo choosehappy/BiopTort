@@ -10,15 +10,15 @@ import numpy as np
 import cv2
 from skimage.measure import label, regionprops
 
-def dilate_mask_using_orientation_aware_kernel(binary_mask: np.ndarray, kernel_size=(20, 20), num_dilations=10):
+NUM_DILATIONS = 8
+
+def dilate_mask_using_orientation_aware_kernel(binary_mask: np.ndarray, kernel_size=(20, 20), num_dilations=NUM_DILATIONS):
     labeled_mask = label(binary_mask)
     props = regionprops(labeled_mask)
     
     dilated_mask = np.zeros_like(binary_mask, dtype=np.uint8)
 
     for prop in props:
-        if prop.area < 10:  # skip tiny regions
-            continue
 
         angle_rad = -prop.orientation + np.pi / 2 # Account for the coordinate system
         eccentricity = prop.eccentricity  # [0, 1]
@@ -82,7 +82,7 @@ def split_labeled_mask_to_binary_masks(labeled_mask: np.ndarray) -> list[np.ndar
     return masks
 
 def split_binary_cnb_mask(binary_mask: np.ndarray) -> list[np.ndarray]:
-    dilated_mask = dilate_mask_using_orientation_aware_kernel(binary_mask, num_dilations=10)
+    dilated_mask = dilate_mask_using_orientation_aware_kernel(binary_mask, num_dilations=NUM_DILATIONS)
     labeled_dilated_mask = label_binary_mask(dilated_mask)
     labeled_mask = assign_labels_using_dilated_mask(binary_mask, labeled_dilated_mask)
     binary_mask_list = split_labeled_mask_to_binary_masks(labeled_mask)
