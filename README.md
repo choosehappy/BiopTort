@@ -39,3 +39,28 @@ options:
 ```bash
 python3 -m bioptort --im_path /data/ --ppt_path /data/<YOUR_PPT_NAME>.pptx --csv_path /data/<YOUR_CSV_NAME>.csv
 ```
+
+## Citation
+The related paper is published in the Archives of Pathology and Laboratory Medicine:
+
+[https://meridian.allenpress.com/aplm/article/doi/10.5858/arpa.2025-0028-OA/508037]()
+
+Please use below to cite this paper if you find this repository useful or if you use the software shared here in your research.
+
+```
+Jacobs, J., Wiener, D., Pathak, T., Farré, X., Mirtti, T., & Janowczyk, A. (2025). Standardized Reporting of Core Needle Biopsy TortuosityBiopTort—A Computer-Aided Protocol for Categorizing Tortuosity. Archives of Pathology & Laboratory Medicine. https://doi.org/10.5858/ARPA.2025-0028-OA
+```
+
+```
+@article{Jacobs2025,
+   author = {Jackson Jacobs and Dan Wiener and Tilak Pathak and Xavier Farré and Tuomas Mirtti and Andrew Janowczyk},
+   doi = {10.5858/ARPA.2025-0028-OA},
+   issn = {1543-2165},
+   journal = {Archives of Pathology \& Laboratory Medicine},
+   month = {10},
+   title = {Standardized Reporting of Core Needle Biopsy TortuosityBiopTort—A Computer-Aided Protocol for Categorizing Tortuosity},
+   url = {https://dx.doi.org/10.5858/arpa.2025-0028-OA},
+   year = {2025}
+}
+
+```
