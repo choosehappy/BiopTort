@@ -48,7 +48,7 @@ The related paper is published in the Archives of Pathology and Laboratory Medic
 Please use below to cite this paper if you find this repository useful or if you use the software shared here in your research.
 
 ```
-Standardized Reporting of Core Needle Biopsy Tortuosity: BiopTort—A Computer-Aided Protocol for Categorizing Tortuosity. Arch Pathol Lab Med 2025; doi: https://doi.org/10.5858/arpa.2025-0028-OA
+Jacobs, J., Wiener, D., Pathak, T., Farré, X., Mirtti, T., & Janowczyk, A. , "Standardized Reporting of Core Needle Biopsy Tortuosity: BiopTort—A Computer-Aided Protocol for Categorizing Tortuosity", Arch Pathol Lab Med 2025; doi: https://doi.org/10.5858/arpa.2025-0028-OA
 ```
 
 ```
