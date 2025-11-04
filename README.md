@@ -48,19 +48,19 @@ The related paper is published in the Archives of Pathology and Laboratory Medic
 Please use below to cite this paper if you find this repository useful or if you use the software shared here in your research.
 
 ```
-Jacobs, J., Wiener, D., Pathak, T., Farré, X., Mirtti, T., & Janowczyk, A. (2025). Standardized Reporting of Core Needle Biopsy TortuosityBiopTort—A Computer-Aided Protocol for Categorizing Tortuosity. Archives of Pathology & Laboratory Medicine. https://doi.org/10.5858/ARPA.2025-0028-OA
+Standardized Reporting of Core Needle Biopsy Tortuosity: BiopTort—A Computer-Aided Protocol for Categorizing Tortuosity. Arch Pathol Lab Med 2025; doi: https://doi.org/10.5858/arpa.2025-0028-OA
 ```
 
 ```
-@article{Jacobs2025,
-   author = {Jackson Jacobs and Dan Wiener and Tilak Pathak and Xavier Farré and Tuomas Mirtti and Andrew Janowczyk},
-   doi = {10.5858/ARPA.2025-0028-OA},
-   issn = {1543-2165},
-   journal = {Archives of Pathology \& Laboratory Medicine},
-   month = {10},
-   title = {Standardized Reporting of Core Needle Biopsy TortuosityBiopTort—A Computer-Aided Protocol for Categorizing Tortuosity},
-   url = {https://dx.doi.org/10.5858/arpa.2025-0028-OA},
-   year = {2025}
+@article{10.5858/arpa.2025-0028-OA,
+    author = {Jacobs, Jackson and Wiener, Dan and Pathak, Tilak and Farré, Xavier and Mirtti, Tuomas and Janowczyk, Andrew},
+    title = {Standardized Reporting of Core Needle Biopsy Tortuosity: BiopTort—A Computer-Aided Protocol for Categorizing Tortuosity},
+    journal = {Archives of Pathology & Laboratory Medicine},
+    year = {2025},
+    month = {10},
+    issn = {0003-9985},
+    doi = {10.5858/arpa.2025-0028-OA},
+    url = {https://doi.org/10.5858/arpa.2025-0028-OA},
+    eprint = {https://meridian.allenpress.com/aplm/article-pdf/doi/10.5858/arpa.2025-0028-OA/3543274/10.5858_arpa.2025-0028-oa.pdf},
 }
-
 ```
