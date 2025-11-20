@@ -7,6 +7,6 @@
     },
     "mounts": [
         "source=${localWorkspaceFolder},target=/opt/BiopTort,type=bind",
-        "source=/home/jackson/research/data/dan_problematic_data,target=/data,type=bind"
+        "source=HOST_MACHINE_DATA_PATH,target=/data,type=bind"
     ]
 }

@@ -528,28 +528,20 @@ def main():
 
             # find largest index of greater tortuosity
             t_ind = len(tort_values) - 1
-            new_loc_ind = -1
+            new_loc_ind = len(tort_values)  # default to end of list, will be updated if sorting is enabled and the slide has higher tortuosity than previous slide(s).
 
             if args.sort:
                 while t_ind >= 0 and xy_tortuosity > tort_values[t_ind]:
                     new_loc_ind = t_ind
                     t_ind -= 1
 
+            tort_values.insert(new_loc_ind, xy_tortuosity)
+            sorted_fns.insert(new_loc_ind, fn)
+            sorted_core_mask_indices.insert(new_loc_ind, core_mask_i)
+            sorted_skips.insert(new_loc_ind, b_gap_count)
+            sorted_pred_grades.insert(new_loc_ind, pred_grade)
 
-            
-            # move slide into sorted position if not already
-            if new_loc_ind == -1:
-                tort_values.append(xy_tortuosity)
-                sorted_fns.append(fn)
-                sorted_core_mask_indices.append(core_mask_i)
-                sorted_skips.append(b_gap_count)
-                sorted_pred_grades.append(pred_grade)
-            else:
-                tort_values.insert(new_loc_ind, xy_tortuosity)
-                sorted_fns.insert(new_loc_ind, fn)
-                sorted_core_mask_indices.insert(new_loc_ind, core_mask_i)
-                sorted_skips.insert(new_loc_ind, b_gap_count)
-                sorted_pred_grades.insert(new_loc_ind, pred_grade)
+            if new_loc_ind < len(tort_values):
                 move_slide(ppt.slides, slide, new_loc_ind)
 
             with BytesIO() as img_buf:
@@ -566,6 +558,7 @@ def main():
                                 height=ppt.slide_width * (height/width) / 2)
                 plt.close()
 
+            # Alternative plot of curvature scale space (not currently used)
             # with BytesIO() as img_buf1:
             #     # add plot of curvature space to slide
             #     sigmas = np.linspace(0.1, 10, 50)
