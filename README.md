@@ -14,7 +14,7 @@ BiopTort produces two types of output:
 ## Installation
 ### Using Docker
 ```bash
-docker run -v <YOUR_DATA_PATH>:/data -it jacksonjacobs1/bioptort:main /bin/bash
+docker run -v <YOUR_DATA_PATH>:/data -it histotools/bioptort:main /bin/bash
 ```
 
 ## Usage
