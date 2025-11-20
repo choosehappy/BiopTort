@@ -5,6 +5,8 @@ import seaborn as sns
 from matplotlib.collections import PathCollection
 import numpy as np
 
+from bioptort.analysis.constants import RATER_NAMES
+
 # csv_path = "/media/jackson/backup/dp_data/tortuosity_study/read_csvs/score_tables/r1_times_no_duplicates_sufficient_tissue.csv"
 # csv_path2 = "/media/jackson/backup/dp_data/tortuosity_study/read_csvs/score_tables/r2_times_no_duplicates_sufficient_tissue.csv"
 # csv_path3 = "/media/jackson/backup/dp_data/tortuosity_study/read_csvs/score_tables/r4_times.csv"
@@ -14,10 +16,9 @@ csv_path2 = "/media/jackson/SOMAI_backup_jja/tortuosity_study/read_csvs/score_ta
 csv_path3 = "/media/jackson/SOMAI_backup_jja/tortuosity_study/read_csvs/score_tables/r4_times.csv"
 
 #%%
-readers = ["Xavier", "Tuomas", "Tilak"]
-df1 = pd.read_csv(csv_path)[readers]
-df2 = pd.read_csv(csv_path2)[readers]
-df3 = pd.read_csv(csv_path3)[readers]
+df1 = pd.read_csv(csv_path)[RATER_NAMES]
+df2 = pd.read_csv(csv_path2)[RATER_NAMES]
+df3 = pd.read_csv(csv_path3)[RATER_NAMES]
 
 df1['Read'] = 'Read 1'
 df2['Read'] = 'Read 2'
@@ -50,14 +51,13 @@ plt.show()
 #%%
 paths = [csv_path, csv_path2, csv_path3]
 read_names = ["r1", "r2", "r3"]
-readers = ["Xavier", "Tuomas", "Tilak"]
 
 for i, path in enumerate(paths):
     print(f"Read: {read_names[i]} --------------")
     df = pd.read_csv(path)
-    all_times = df[readers].to_numpy().flatten()
+    all_times = df[RATER_NAMES].to_numpy().flatten()
     
-    for reader in readers:
+    for reader in RATER_NAMES:
         arr = df[reader].to_numpy()
         print(f"Reader: {reader}, mean: {arr.mean():.2f}, std: {arr.std():.2f}")
     

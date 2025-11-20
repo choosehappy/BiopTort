@@ -1,0 +1,1 @@
+RATER_NAMES = ["Rater 1", "Rater 2", "Rater 3"]

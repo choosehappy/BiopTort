@@ -4,22 +4,24 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import pandas as pd
 from sklearn.metrics import cohen_kappa_score
+from bioptort.analysis.constants import RATER_NAMES
 
 
+r1_name = RATER_NAMES[0]
+r2_name = RATER_NAMES[1]
+r3_name = RATER_NAMES[2]
 # df1 = pd.read_csv("/media/jackson/backup/dp_data/tortuosity_study/read_csvs/score_tables/r4_scores.csv")
 # df1 = pd.read_csv("/media/jackson/backup/dp_data/tortuosity_study/read_csvs/score_tables/clinically_relevant_measures/r2_XY_tort_no_duplicates_sufficient_tissue.csv")
 # df1 = pd.read_csv('/media/jackson/backup/dp_data/tortuosity_study/read_csvs/score_tables/clinically_relevant_measures/r4_XY_tort.csv')
 # df1 = pd.read_csv('/media/jackson/backup/dp_data/tortuosity_study/read_csvs/score_tables/clinically_relevant_measures/r2_Z_tort_no_duplicates_sufficient_tissue.csv')
 df1 = pd.read_csv('/media/jackson/backup/dp_data/tortuosity_study/read_csvs/score_tables/clinically_relevant_measures/r4_Z_tort.csv')
-# df2 = pd.read_csv("tuomas_r1.csv")
-# df3 = pd.read_csv("xavier_r1.csv")
-tilak = df1["Tilak"].to_numpy()
-tuomas = df1["Tuomas"].to_numpy()
-xavier = df1["Xavier"].to_numpy()
+r3_scores = df1[r3_name].to_numpy()
+r2_scores = df1[r2_name].to_numpy()
+r1_scores = df1[r1_name].to_numpy()
 bt = df1["BT pred_grade"].to_numpy()
 
 # -------- PARAMS -------- #
-scores = {7: xavier, 9: tilak, 12: tuomas, 1: bt}
+scores = {7: r1_scores, 9: r3_scores, 12: r2_scores, 1: bt}
 # labels = [1,2,3,4]
 # grade_names = ["Tier 1", "Tier 2", "Tier 3", "Tier 4"]
 # grade_names = ["low", "medium", "high"]
@@ -32,8 +34,8 @@ grade_names = ["Low Z Tortuosity", "High Z Tortuosity"]
 read_name = "3"
 # ------------------------ #
 # %%
-combs = [(7,9), (12,7), (9,12), (1, 7), (1, 9), (1, 12)] # (xavier, tilak), (tuomas, xavier), (tilak, tuomas). indices irrelevant
-users = {"7": "Xavier (R1)", "9": "Tilak (R3)", "12": "Tuomas (R2)", "1": "BiopTort"}
+combs = [(7,9), (12,7), (9,12), (1, 7), (1, 9), (1, 12)]
+users = {"7": r1_name, "9": r3_name, "12": r2_name, "1": "BiopTort"}
 for i in range(len(combs)):
     cf = confusion_matrix(scores[combs[i][0]], scores[combs[i][1]],)
     disp = ConfusionMatrixDisplay(cf, display_labels=labels)
