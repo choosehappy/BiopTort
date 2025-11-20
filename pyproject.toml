@@ -48,7 +48,11 @@ Homepage = "https://github.com/choosehappy/BiopTort"
 
 # ----------------------------------------------------------------------------------
 [project.scripts]
-run_module = "bioptort.__main__:main"
+bioptort = "bioptort.__main__:main"
+
+# ----------------------------------------------------------------------------------
+[tool.setuptools]
+packages = ["bioptort"]
 
 # ----------------------------------------------------------------------------------
 [tool.setuptools_scm]

@@ -12,14 +12,20 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg:
     libopenslide0 \
     procps \
     # Requirement for opencv
-    libgl1 
+    libgl1
+
+RUN python3.9 -m pip install uv
 
 RUN mkdir -p /opt/BiopTort
 WORKDIR /opt/BiopTort
-COPY . /opt/BiopTort/
 
-ENV PATH="/opt/BiopTort/venv/bin:$PATH"
+COPY ../pyproject.toml ./
+RUN uv venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install -r pyproject.toml
 
-RUN python3.9 -m venv venv \
-    && python3.9 -m pip install --upgrade pip \
-    && pip install -e .
+COPY ./ ./
+# Install BiopTort to the uv-managed environment
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install .

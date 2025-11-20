@@ -1,5 +1,6 @@
 import os
-from skimage.morphology import remove_small_holes, remove_small_objects, binary_dilation, disk
+from typing import Tuple, Optional
+from skimage.morphology import remove_small_holes, remove_small_objects, disk
 from skimage.measure import regionprops, find_contours
 from skimage.segmentation import active_contour
 from skimage.filters import rank
@@ -8,6 +9,8 @@ from shapely import LineString, Polygon
 from scipy.ndimage import binary_dilation, distance_transform_edt, binary_fill_holes, gaussian_filter1d
 from scipy.interpolate import interp1d
 import openslide
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import glob
@@ -20,6 +23,70 @@ from tqdm import tqdm
 import cv2
 import csv
 import argparse
+from bioptort.mask_utils import split_binary_cnb_mask
+
+# ------------------- CONSTANTS -------------------
+WORKING_MAGNIFICATION = 0.625
+MASK_DILATION_ITERATIONS = 1
+MINIMUM_SNAKE_LENGTH = 5
+
+# ------------------- UTILS -------------------
+def get_base_magnification(osh: openslide.OpenSlide) -> float:
+    val = osh.properties.get("openslide.objective-power") \
+          or osh.properties.get("aperio.AppMag")
+    
+    if val is None:
+        raise ValueError("Base magnification not found in slide properties. Please provide it manually using the --override_base_magnification argument.")
+    
+    return float(val)
+
+def get_downsample_factor(base_magnification: float) -> float:
+    return base_magnification / WORKING_MAGNIFICATION
+
+def get_best_level_for_downsample(osh: openslide.OpenSlide, downsample_factor: float) -> Tuple[int, bool]: 
+        relative_down_factors_idx=[np.isclose(i/downsample_factor,1,atol=.01) for i in osh.level_downsamples]
+        level=np.where(relative_down_factors_idx)[0]
+        if level.size:
+            return (level[0], True)
+        else:
+            return (osh.get_best_level_for_downsample(downsample_factor), False)
+
+def resize_image(img: Image.Image, basewidth=None, scalefactor=0.5) -> Image.Image:
+    """Resize an image to a specified width while maintaining aspect ratio.
+
+    Args:
+        img (Image): the image to resize
+        basewidth (int, optional): the width to resize to. Defaults to None.
+        scalefactor (float, optional): the scale factor to resize by. Defaults to 0.5. Only applied if basewidth is not specified.
+
+    Returns:
+        Image: the resized image
+    """
+    if basewidth is None:
+        return img.resize((int(img.size[0] * scalefactor), int(img.size[1] * scalefactor)))
+
+    wpercent = (basewidth/float(img.size[0]))
+    hsize = int((float(img.size[1])*float(wpercent)))
+    
+    return img.resize((basewidth, hsize))
+
+def get_downsampled_image(osh: openslide.OpenSlide, override_base_magnification: float=None) -> Image.Image:
+    base_mag = override_base_magnification or get_base_magnification(osh)
+
+    target_downsample_factor = get_downsample_factor(base_mag)
+    level, isexactlevel = get_best_level_for_downsample(osh, target_downsample_factor)
+
+    region = osh.read_region((0, 0), level, osh.level_dimensions[level])
+
+    if isexactlevel:
+        return resize_image(region, scalefactor=1.0)
+    else:
+        current_dims = osh.level_dimensions[level]
+        target_dims = tuple(np.rint(np.asarray(osh.level_dimensions[0]) / target_downsample_factor).astype(int))
+        scalefactor = target_dims[0] / current_dims[0]
+        resized_region = resize_image(region, scalefactor=scalefactor)
+        return resized_region
+
 
 # ------------------- LOOP REMOVAL -------------------
 def segments_intersect(s1, s2):
@@ -64,7 +131,10 @@ def remove_loops(points):
 
 # ---------------------------------------------------
 def remove_background_points(points, mask):
-    return np.array([p for p in points if mask[int(p[0]), int(p[1])]])
+    try:
+        return np.array([p for p in points if mask[int(p[0]), int(p[1])]])
+    except IndexError:
+        raise IndexError("L contains points that exceed the boundaries of the image. Your image likely contains artifacts near the edges.")
 
 def apply_gaussian_filter(point_array, sigma=1):
     X_values = point_array[:, 0]
@@ -248,10 +318,18 @@ def generate_mask(img: np.ndarray, disk_size=2, threshold=210) -> np.ndarray:
 
     return imgfilt < threshold  # return the binary mask
 
-def compute_snake(fn, mask_path=None):
+def process_mask(mask: PIL.Image) -> np.ndarray:
+    b = remove_small_holes(mask, 1000)
+    b = remove_small_objects(b, 100)
+    if MASK_DILATION_ITERATIONS > 0:
+        b = binary_dilation(b, iterations=MASK_DILATION_ITERATIONS)
+
+    return binary_fill_holes(b)
+
+
+def compute_snake(b: np.ndarray):
     # --- Hyperparameters ---
     pixel_lengths_between_points = 6    # the number of pixel-lengths between each point on the initial line.
-    scale_factor = 0.5
     # --- active contour parameters ---
     alpha = 0.001
     beta = 0.001 # 0.4
@@ -263,33 +341,13 @@ def compute_snake(fn, mask_path=None):
     convergence = .01
     # -----------------------------
 
-    osh = openslide.OpenSlide(fn)
-    print(f'Working on file: {fn}')
-    print(f'Level dimensions: {osh.level_dimensions}')
-    img = osh.read_region((0, 0), 2, osh.level_dimensions[2])
-    img = resize_image(img, scalefactor=scale_factor)
-
-    # Load the mask if it exists
-    if mask_path:
-        mask = Image.open(mask_path)
-        mask = resize_image(mask, basewidth=img.size[0])
-        b = np.asarray(mask)
-        b = np.where(b > 0, 1, 0)
-    else:
-        npy_img = np.array(img)[:,:,:3]
-        b = generate_mask(npy_img)
-
-    
     # basewidth = 1000
     # wpercent = (basewidth/float(img.size[0]))
     # hsize = int((float(img.size[1])*float(wpercent)))
     # img = img.resize((basewidth, hsize))
-    b = remove_small_holes(b, 1000)
-    b = remove_small_objects(b, 100)
 
-    # find contours using a gently dilated binary mask.
-    contours = find_contours(binary_fill_holes(
-        binary_dilation(b, iterations=1)))
+    # find contours
+    contours = find_contours(b)
     
 
     # compute the distance transform and normalize to the range [0, 0.5]
@@ -303,7 +361,13 @@ def compute_snake(fn, mask_path=None):
     # sum the two distributions
     eb_total = eb + e_inv_b
 
-    rp = regionprops(b.astype(np.uint8))[0]
+    props = regionprops(b.astype(np.uint8))
+
+    if len(props) == 0:
+        raise ValueError("No tissue regions found in the binary mask.")
+
+    rp = props[0]
+
     print(rp.orientation)
     if rp.orientation <= 0:
         rc_start = (rp.bbox[0], rp.bbox[3])
@@ -318,6 +382,8 @@ def compute_snake(fn, mask_path=None):
 
     dist = np.linalg.norm(closest - farthest)
     num_points = int(dist / pixel_lengths_between_points)
+    if num_points < MINIMUM_SNAKE_LENGTH:
+        raise ValueError("The detected tissue region is too small to compute a reliable snake. Skipping.")
     r = np.linspace(closest[0], farthest[0], num_points)
     c = np.linspace(closest[1], farthest[1], num_points)
     
@@ -328,9 +394,10 @@ def compute_snake(fn, mask_path=None):
     snake = active_contour(eb_total, init_adjusted, alpha=alpha, beta=beta, gamma=gamma, w_line=w_line, max_px_move=max_px_move,
                     w_edge=w_edge, max_num_iter=max_num_iter, convergence=convergence, boundary_condition='fixed')
     
-    return snake, img, contours, rp, b, num_points
+    return snake, contours, rp, b, num_points
     
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--im_path', type=str, required=True, help="The directory containing (openslide-compatible) CNB WSIs.")
     parser.add_argument('--ppt_save', type=str, required=True, help="The path to save the powerpoint presentation, including the filename.")
@@ -338,9 +405,9 @@ if __name__ == "__main__":
     parser.add_argument('--mask_path', type=str, default=None, required=False, help="Optional path to existing png tissue masks for the CNB WSIs with matching filenames.")
     parser.add_argument('--sort', '-s', default=False, action='store_true', help="Sort the slides in order of highest to lowest tortuosity.")
     parser.add_argument('--gauss_sigma', type=float, default=20, help="The sigma value for the gaussian filter.")
+    parser.add_argument('--override_base_magnification', type=float, default=20.0, help="Manually specify the base magnification of the WSI if it cannot be read from the file properties.")
+    parser.add_argument('--multiple_sections', '-m', default=False, action='store_true', help="Experimental: Enable handling of multiple sections per slide. May not work as intended.")
     args = parser.parse_args()
-
-    os.environ["PAQUO_QUPATH_DIR"] = "/opt/QuPath/bin/QuPath"
     files = sorted(glob.glob(os.path.join(args.im_path, "*.svs")))
 
     if args.mask_path:
@@ -352,180 +419,211 @@ if __name__ == "__main__":
     sorted_fns = []
     sorted_skips = []
     sorted_pred_grades = []
+    sorted_core_mask_indices = []
 
     for fn_i, fn in tqdm(enumerate(files)):
-        fname = fn.split('/')[-1]
+        # ------------- LOAD IMAGE -------------
+        osh = openslide.OpenSlide(fn)
+        print(f'Working on file: {fn}')
+        print(f'Level dimensions: {osh.level_dimensions}')
+        image = get_downsampled_image(osh, override_base_magnification=args.override_base_magnification)
+
+        # Load the mask if it exists
         if args.mask_path:
-            mask_filepath = mask_filepaths[fn_i]
+            mask = Image.open(mask_filepaths[fn_i])
+            mask = resize_image(mask, basewidth=image.size[0])
+            binary_mask = np.asarray(mask)
+            binary_mask = np.where(binary_mask > 0, 1, 0)
         else:
-            mask_filepath = None
+            npy_img = np.array(image)[:,:,:3]
+            binary_mask = generate_mask(npy_img)
 
-        # ------------- COMPUTE SNAKE -------------
-        # ... and other image processing
-        snake, img, contours, rp, b, num_points = compute_snake(fn, mask_path=mask_filepath)
+        binary_mask = process_mask(binary_mask)
+        core_masks = split_binary_cnb_mask(binary_mask) if args.multiple_sections else [binary_mask]
 
+        for core_mask_i, core_mask in enumerate(core_masks):
 
-        # ------------- REMOVE LOOPS -------------
-        snake = remove_loops(snake)
-        # ------------- SNAKE SMOOTHING -------------
-        snake = interpolate_points(snake, num_points)
-        snake = remove_background_points(snake, b)
-        snake = apply_gaussian_filter(snake, sigma=args.gauss_sigma)
-        
-        snake = snake[0:-1:10]
-
-        # ------------- CALCULATE XY TORTUOSITY -------------
-        L = np.sum(np.linalg.norm(np.diff(snake, axis=0), axis=-1))
-        L_cumu = np.cumsum(np.linalg.norm(np.diff(snake, axis=0), axis=-1))
-        L_0 = np.linalg.norm(snake[-1] - snake[0])
-        xy_tortuosity = round(L / L_0, 4)
-        # --------------------------------------------------------
-
-        # calculate two boundaries. One at the 10th percentile of the snake and one at the 90th percentile.
-        beginning = None
-        end = (500,500)
-
-        for i in range(len(snake)):
-            if beginning is None and L_cumu[i] > L * 0.1:
-                beginning = snake[i]
-            if L_cumu[i] > L * 0.9:
-                end = snake[i]
-                break
-        vect = np.array([np.sin(-1 * rp.orientation), np.cos(rp.orientation)])
-        bound1 = np.array([beginning - vect * 100, beginning + vect * 100])
-        bound2 = np.array([end - vect * 100, end + vect * 100])
-
-        print(f'bound1: {bound1}')
-
-        # filter contours
-        filtered_contours = filter_contours(contours, (beginning, end), rp.orientation, snake)
-
-        # ------------- CALCULATE GRADE -------------
-        b_gap_count = len(filtered_contours) - 1
-        pred_grade = calculate_grade(xy_tortuosity, b_gap_count)
-        print(f'xy_tortuosity: {xy_tortuosity}')
-        # --------------------------------------------------------
+            # ------------- COMPUTE SNAKE -------------
+            # ... and other image processing
+            try:
+                snake, contours, rp, b, num_points = compute_snake(core_mask)
+            except ValueError as e:
+                print(f"Skipping core {core_mask_i} in file {fn} due to error: {e}")
+                continue
 
 
-        # create plot
-        plt.imshow(img)
-        fmts = ['c', '#ffa530', 'y', 'k', 'm', '#918211','#e875fa', '#b5d9ff', '#ffb5bb', '#3e754d', '#0014c7']
-        print(f'# of filtered contours: {len(filtered_contours)}')
-        for i, c in enumerate(filtered_contours):
-            # plt.plot(c.T[1], c.T[0], f'-.',
-            #          c=f'{fmts[i]}', lw=1, label=f'contour {i}')
-
-            plt.fill(c.T[1], c.T[0], facecolor=f'{fmts[i]}', alpha=0.6, label=f'contour {i + 1}')
+            # ------------- REMOVE LOOPS -------------
+            snake = remove_loops(snake)
+            # ------------- SNAKE SMOOTHING -------------
+            snake = interpolate_points(snake, num_points)
+            snake = remove_background_points(snake, b)
+            snake = apply_gaussian_filter(snake, sigma=args.gauss_sigma)
             
+            snake = snake[0:-1:10]
 
-        # plt.scatter(snake[:, 1], snake[:, 0], marker='x', label='L', c='r', s=1)
-        plt.plot(snake[:, 1], snake[:, 0], label='L', c='r', lw=1)
-        plt.plot([snake[0,1], snake[-1,1]], [snake[0,0], snake[-1,0]], '--b', lw=1, label='L_0')
-        plt.plot(bound1[:, 1], bound1[:, 0], 'g', lw=1, label='10th percentile of L')
-        plt.plot(bound2[:, 1], bound2[:, 0], 'g', lw=1, label='90th percentile of L')
-        plt.legend(fontsize=6)
-        # plt.title(
-        #     f'Filename: {fname}\nTortuosity (L/L_0): {xy_tortuosity}\nNumber of skips: {b_gap_count}')
-        
-        plt.title(
-            f'Tortuosity (L/L_0): {xy_tortuosity}\nNumber of skips: {b_gap_count}\nPredicted Grade: Tier {pred_grade}')#\n Numpoints: {num_points}')
+            # ------------- CALCULATE XY TORTUOSITY -------------
+            L = np.sum(np.linalg.norm(np.diff(snake, axis=0), axis=-1))
+            L_cumu = np.cumsum(np.linalg.norm(np.diff(snake, axis=0), axis=-1))
+            L_0 = np.linalg.norm(snake[-1] - snake[0])
+            xy_tortuosity = round(L / L_0, 4)
+            # --------------------------------------------------------
 
-        # create new slide
-        blank_slide_layout = ppt.slide_layouts[6]
-        slide = ppt.slides.add_slide(blank_slide_layout)
+            # calculate two boundaries. One at the 10th percentile of the snake and one at the 90th percentile.
+            beginning = None
+            end = (500,500)
+
+            for i in range(len(snake)):
+                if beginning is None and L_cumu[i] > L * 0.1:
+                    beginning = snake[i]
+                if L_cumu[i] > L * 0.9:
+                    end = snake[i]
+                    break
+            vect = np.array([np.sin(-1 * rp.orientation), np.cos(rp.orientation)])
+            bound1 = np.array([beginning - vect * 100, beginning + vect * 100])
+            bound2 = np.array([end - vect * 100, end + vect * 100])
+
+            print(f'bound1: {bound1}')
+
+            # filter contours
+            filtered_contours = filter_contours(contours, (beginning, end), rp.orientation, snake)
+
+            # ------------- CALCULATE GRADE -------------
+            b_gap_count = len(filtered_contours) - 1
+            pred_grade = calculate_grade(xy_tortuosity, b_gap_count)
+            print(f'xy_tortuosity: {xy_tortuosity}')
+            # --------------------------------------------------------
 
 
-        # find largest index of greater tortuosity
-        t_ind = len(tort_values) - 1
-        new_loc_ind = -1
+            # create plot
+            plt.imshow(image)
+            fmts = ['c', '#ffa530', 'y', 'k', 'm', '#918211','#e875fa', '#b5d9ff', '#ffb5bb', '#3e754d', '#0014c7']
+            print(f'# of filtered contours: {len(filtered_contours)}')
+            for i, c in enumerate(filtered_contours):
+                # plt.plot(c.T[1], c.T[0], f'-.',
+                #          c=f'{fmts[i]}', lw=1, label=f'contour {i}')
 
-        if args.sort:
-            while t_ind >= 0 and xy_tortuosity > tort_values[t_ind]:
-                new_loc_ind = t_ind
-                t_ind -= 1
+                plt.fill(c.T[1], c.T[0], facecolor=f'{fmts[i]}', alpha=0.6, label=f'contour {i + 1}')
+                
 
-        # move slide into sorted position if not already
-        if new_loc_ind == -1:
-            tort_values.append(xy_tortuosity)
-            sorted_fns.append(fn)
-            sorted_skips.append(b_gap_count)
-            sorted_pred_grades.append(pred_grade)
-        else:
+            # plt.scatter(snake[:, 1], snake[:, 0], marker='x', label='L', c='r', s=1)
+            plt.plot(snake[:, 1], snake[:, 0], label='L', c='r', lw=1)
+            plt.plot([snake[0,1], snake[-1,1]], [snake[0,0], snake[-1,0]], '--b', lw=1, label='L_0')
+            plt.plot(bound1[:, 1], bound1[:, 0], 'g', lw=1, label='10th percentile of L')
+            plt.plot(bound2[:, 1], bound2[:, 0], 'g', lw=1, label='90th percentile of L')
+            plt.legend(fontsize=6)
+            # plt.title(
+            #     f'Filename: {fname}\nTortuosity (L/L_0): {xy_tortuosity}\nNumber of skips: {b_gap_count}')
+            
+            title = (
+                f'Filename: {os.path.basename(fn)}'
+                + (f' | Core Index: {core_mask_i}' if args.multiple_sections else '')
+                + f'\nTortuosity (L/L_0): {xy_tortuosity}\nNumber of skips: {b_gap_count}\nPredicted Grade: Tier {pred_grade}\n'
+            )
+            plt.title(title)
+
+            # create new slide
+            blank_slide_layout = ppt.slide_layouts[6]
+            slide = ppt.slides.add_slide(blank_slide_layout)
+
+
+            # find largest index of greater tortuosity
+            t_ind = len(tort_values) - 1
+            new_loc_ind = len(tort_values)  # default to end of list, will be updated if sorting is enabled and the slide has higher tortuosity than previous slide(s).
+
+            if args.sort:
+                while t_ind >= 0 and xy_tortuosity > tort_values[t_ind]:
+                    new_loc_ind = t_ind
+                    t_ind -= 1
+
             tort_values.insert(new_loc_ind, xy_tortuosity)
             sorted_fns.insert(new_loc_ind, fn)
+            sorted_core_mask_indices.insert(new_loc_ind, core_mask_i)
             sorted_skips.insert(new_loc_ind, b_gap_count)
             sorted_pred_grades.insert(new_loc_ind, pred_grade)
-            move_slide(ppt.slides, slide, new_loc_ind)
 
-        with BytesIO() as img_buf:
-            # add predicted tortuosity to slide
-            plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=600.0)
-            with Image.open(img_buf) as image:
-                width, height = image.size
+            if new_loc_ind < len(tort_values):
+                move_slide(ppt.slides, slide, new_loc_ind)
 
-            addimagetoslide(slide, 
-                            img_buf, 
-                            top=Inches(0), 
-                            left=Inches(0), 
-                            width=ppt.slide_width / 2, 
-                            height=ppt.slide_width * (height/width) / 2)
-            plt.close()
+            with BytesIO() as img_buf:
+                # add predicted tortuosity to slide
+                plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=600.0)
+                with Image.open(img_buf) as figure:
+                    width, height = figure.size
 
-        # with BytesIO() as img_buf1:
-        #     # add plot of curvature space to slide
-        #     sigmas = np.linspace(0.1, 10, 50)
-        #     res = curves.Curve(snake).scale_space(sigmas, features=['curvature'])
+                addimagetoslide(slide, 
+                                img_buf, 
+                                top=Inches(0), 
+                                left=Inches(0), 
+                                width=ppt.slide_width / 2, 
+                                height=ppt.slide_width * (height/width) / 2)
+                plt.close()
 
-        #     fig = plt.figure(figsize=(7,3))
-        #     ax = fig.add_subplot(111)
-        #     pl = ax.imshow(np.log(res["curvature"]),cmap="jet")
-        #     ax.invert_yaxis()
-        #     ax.set_aspect(5)
-        #     ax.grid()
-        #     ax.set_xlabel("curve position index")
-        #     ax.set_ylabel("sigma")
-        #     cb = fig.colorbar(pl,shrink=0.7)
-        #     cb.set_label("log curvature mu")
-        #     plt.tight_layout()
+            # Alternative plot of curvature scale space (not currently used)
+            # with BytesIO() as img_buf1:
+            #     # add plot of curvature space to slide
+            #     sigmas = np.linspace(0.1, 10, 50)
+            #     res = curves.Curve(snake).scale_space(sigmas, features=['curvature'])
 
-        #     plt.savefig(img_buf1, format='png', bbox_inches='tight', dpi=600.0)
-        #     with Image.open(img_buf1) as image:
-        #         width, height = image.size
+            #     fig = plt.figure(figsize=(7,3))
+            #     ax = fig.add_subplot(111)
+            #     pl = ax.imshow(np.log(res["curvature"]),cmap="jet")
+            #     ax.invert_yaxis()
+            #     ax.set_aspect(5)
+            #     ax.grid()
+            #     ax.set_xlabel("curve position index")
+            #     ax.set_ylabel("sigma")
+            #     cb = fig.colorbar(pl,shrink=0.7)
+            #     cb.set_label("log curvature mu")
+            #     plt.tight_layout()
 
-        #     addimagetoslide(slide, 
-        #                     img_buf1, 
-        #                     top=Inches(6), 
-        #                     left=0, 
-        #                     width=ppt.slide_width, 
-        #                     height=ppt.slide_width * (height/width) / 2)
-        #     plt.close()
+            #     plt.savefig(img_buf1, format='png', bbox_inches='tight', dpi=600.0)
+            #     with Image.open(img_buf1) as image:
+            #         width, height = image.size
 
-        with BytesIO() as img_buf2:
-            # add CNB thumbnail to slide
-            osh = openslide.OpenSlide(fn)
-            thumbnail = osh.get_thumbnail(size=(500, 500))
-            
-            plt.imshow(thumbnail)
+            #     addimagetoslide(slide, 
+            #                     img_buf1, 
+            #                     top=Inches(6), 
+            #                     left=0, 
+            #                     width=ppt.slide_width, 
+            #                     height=ppt.slide_width * (height/width) / 2)
+            #     plt.close()
 
-            plt.savefig(img_buf2, format='png', bbox_inches='tight', dpi=600.0)
-            with Image.open(img_buf2) as image:
-                width, height = image.size
+            with BytesIO() as img_buf2:
+                # add CNB thumbnail to slide
+                osh = openslide.OpenSlide(fn)
+                thumbnail = osh.get_thumbnail(size=(500, 500))
+                
+                plt.imshow(thumbnail)
 
-            addimagetoslide(slide, 
-                            img_buf2, 
-                            top=Inches(0.5), 
-                            left=ppt.slide_width/2, 
-                            width=ppt.slide_width / 2, 
-                            height=ppt.slide_width * (height/width) / 2)
-            plt.close()
+                plt.savefig(img_buf2, format='png', bbox_inches='tight', dpi=600.0)
+                with Image.open(img_buf2) as figure:
+                    width, height = figure.size
 
-        if args.csv_save:
-            # write sorted_fns and tort_values to a csv
-            with open(args.csv_save, 'w', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(['filename', 'tortuosity', '#skips', 'pred_grade'])
-                for i, fn in enumerate(sorted_fns):
-                    writer.writerow([fn, tort_values[i], sorted_skips[i], sorted_pred_grades[i]])
+                addimagetoslide(slide, 
+                                img_buf2, 
+                                top=Inches(0.5), 
+                                left=ppt.slide_width/2, 
+                                width=ppt.slide_width / 2, 
+                                height=ppt.slide_width * (height/width) / 2)
+                plt.close()
+
+            if args.csv_save:
+                # write sorted_fns and tort_values to a csv
+                CORE_IDX_HEADER_INDEX = 1
+                with open(args.csv_save, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+                    header_row = ['filename', 'tortuosity', '#skips', 'pred_grade']
+                    if args.multiple_sections:
+                        header_row.insert(CORE_IDX_HEADER_INDEX, 'core_index')
+                    writer.writerow(header_row)
+                    for i, fn in enumerate(sorted_fns):
+                        row = [fn, tort_values[i], sorted_skips[i], sorted_pred_grades[i]]
+                        if args.multiple_sections:
+                            row.insert(CORE_IDX_HEADER_INDEX, sorted_core_mask_indices[i])
+                        writer.writerow(row)
 
 
     ppt.save(args.ppt_save)
+
+if __name__ == "__main__":
+    main()
