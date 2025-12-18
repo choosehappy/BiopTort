@@ -49,7 +49,7 @@ bioptort --im_path /data/ --ppt_save /data/<YOUR_PPT_NAME>.pptx --csv_save /data
 ## Citation
 The related paper is published in the Archives of Pathology and Laboratory Medicine:
 
-[https://meridian.allenpress.com/aplm/article/doi/10.5858/arpa.2025-0028-OA/508037](https://meridian.allenpress.com/aplm/article/doi/10.5858/arpa.2025-0028-OA/508037)
+[https://doi.org/10.5858/arpa.2025-0028-OA](https://doi.org/10.5858/arpa.2025-0028-OA)
 
 Please use below to cite this paper if you find this repository useful or if you use the software shared here in your research.
 
